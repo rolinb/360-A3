@@ -3,10 +3,11 @@
 #include "../disk/disk.h"
 
 int currentInode =0;
-int MAX_INODES = 2000;
+int MAX_INODES = 650;
 /*
 *Code taken from tutorial 9
 */
+#define TO_HEX(i) (i <= 9 ? '0' + i : 'A' - 10 + i) //convert to hex digit
 
 
 char* createEmptyInode(){
@@ -25,11 +26,47 @@ inode map
 Takes blocks 2-9 stores address of each inodes location e.g
 inode 1 - block x
 inode 2 - block y
+Inode num needs 3 bytes as does which block? 1.5 for each so if we say 4 its cleaner
+lets use 1024 then we'll take 2 bytes for the inode num followed by 2 for the address
 */
 void createInodeMap(FILE* disk){
+  //int counter =0;
+  int i;
+  char hex[2];
+  //unsigned char  tmp, tmp2;
+  //set up map? in a janky fashion
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  readBlock(disk, 2, buffer);
+  for(i=0; i<128; i++){
+        hex[0] = (i) >>8;
+        hex[1] = (i) & 0xff;
+        buffer[i*4] = hex[0];
+        buffer[i*4+1] = hex[1];
+  }
+  writeBlock(disk, 2, buffer);
+  free(buffer);
+  buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  readBlock(disk, 3, buffer);
+  for(i=128; i<256; i++){
+        hex[0] = (i) >>8;
+        hex[1] = (i) & 0xff;
+        buffer[i*4] = hex[0];
+        buffer[i*4+1] = hex[1];
+  }
+  writeBlock(disk, 3, buffer);
+  readBlock(disk, 4, buffer);
+  for(i=256; i<384; i++){
+        hex[0] = (i) >>8;
+        hex[1] = (i) & 0xff;
+        buffer[i*4] = hex[0];
+        buffer[i*4+1] = hex[1];
+  }
+  writeBlock(disk, 4, buffer);
+
+
 
 }
-
+//mark the inode map find where and add the address
 void updateInodeMap(FILE* disk, int where){
 
 }
@@ -169,7 +206,7 @@ int main (int argc, char* argv[]){
   //this reserves first x blocks x is currently 10 do to spec
   for(i=0; i<10; i++)
     reserveBlock(i, disk);
-
+/*
   int nextFreeBlock = findNextAvailableBlock(disk);
 
   printf("The next free block is expect 10: %d\n", nextFreeBlock);
@@ -216,6 +253,8 @@ int main (int argc, char* argv[]){
   nextFreeBlock = findNextAvailableBlock(disk);
   printf("The next free block is expect 12: %d\n", nextFreeBlock);
 
+  */
+  createInodeMap(disk);
 
   fclose(disk);
   //this is for super block
