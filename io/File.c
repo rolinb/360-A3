@@ -2,15 +2,22 @@
 #include <stdlib.h>
 #include "../disk/disk.h"
 
-int currentInode =0;
-int MAX_INODES = 650;
+int MAX_INODES = 1024;
 /*
 *Code taken from tutorial 9
 */
 #define TO_HEX(i) (i <= 9 ? '0' + i : 'A' - 10 + i) //convert to hex digit
 
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
+// THIS IS THE INODE AREA
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
 
 char* createEmptyInode(){
+
   char* inode = malloc(32);
   return inode;
 }
@@ -19,7 +26,6 @@ char* findInode(FILE* disk){
   //WHAT DO I DO HERE
   return NULL;
 }
-
 
 /*
 inode map
@@ -31,43 +37,78 @@ lets use 1024 then we'll take 2 bytes for the inode num followed by 2 for the ad
 */
 void createInodeMap(FILE* disk){
   //int counter =0;
-  int i;
+  int i,j;
   char hex[2];
   //unsigned char  tmp, tmp2;
   //set up map? in a janky fashion
   char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
-  readBlock(disk, 2, buffer);
-  for(i=0; i<128; i++){
-        hex[0] = (i) >>8;
-        hex[1] = (i) & 0xff;
-        buffer[i*4] = hex[0];
-        buffer[i*4+1] = hex[1];
-  }
-  writeBlock(disk, 2, buffer);
-  free(buffer);
-  buffer = malloc(sizeof(char) * BLOCK_SIZE);
-  readBlock(disk, 3, buffer);
-  for(i=0; i<128; i++){
-        hex[0] = (i+128) >>8;
-        hex[1] = (i+128) & 0xff;
-        buffer[i*4] = hex[0];
-        buffer[i*4+1] = hex[1];
-  }
-  writeBlock(disk, 3, buffer);
-  readBlock(disk, 4, buffer);
-  for(i=0; i<128; i++){
-        hex[0] = (i+256) >>8;
-        hex[1] = (i+256) & 0xff;
-        buffer[i*4] = hex[0];
-        buffer[i*4+1] = hex[1];
-  }
-  writeBlock(disk, 4, buffer);
 
-
-
+  for (i=2; i<10; i++){
+    readBlock(disk, i, buffer);
+    for(j=0; j<128;j++){
+      hex[0] = (j + ((i-2)*128)) >>8;
+      hex[1] = (j+ ((i-2)*128)) & 0xff;
+      buffer[j*4] = hex[0];
+      buffer[j*4+1] = hex[1];
+    }
+    writeBlock(disk, i, buffer);
+  }
 }
+
+
+
+int findNextAvailableInode(FILE* disk){
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  int i,j;
+  for (i=2; i<10; i++){
+    readBlock(disk, i, buffer);
+    for(j=1; j<512;j++){
+      if(i==2 && j<7) continue; //bypassing the first couple reserved inodes
+      if(!(j%2) && j%4){ //i think this gets the ones i want?
+        printf("HMM %d\n", buffer[j]);
+        printf("mmm %d\n", buffer[j+1]);
+        if(buffer[j] == 0 && buffer[j+1] == 0){
+          printf("Free iNode: %d\n", (j/4+(i-2)*128));
+          return (j/4+(i-2)*128); //this looks awful
+        }
+      }
+        //printf("Should not be empty - %c\n", buffer[j]);
+
+    }
+  }
+  return 0;
+}
+
+
 //mark the inode map find where and add the address
-void updateInodeMap(FILE* disk, int where){
+int updateInodeMap(FILE* disk, int address, int inode){
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  //int i,j;
+  int whichBlock = inode/128 + 2;
+  if(address > NUM_BLOCKS) return -1; //bail out we should never get here
+  readBlock(disk, whichBlock, buffer);
+
+  /*int[4] values;
+  value[0] = address/1000;
+  value[1] = address/100 %10;
+  value[2] = address/10 %10;
+  value[3] = address%10;
+*/
+  char hex[2];
+  hex[0] = (address) >>8;
+  hex[1] = (address) & 0xff;
+
+  //maths
+  //inode 2 is block 8,9 inode 3 is
+  buffer[inode*4+2] = hex[0];
+  buffer[inode*4+2] = hex[1];
+
+  writeBlock(disk, whichBlock, buffer);
+
+
+
+
+  return 0;
 
 }
 
@@ -78,6 +119,16 @@ void addFileSizeToInode(char* inode, int size){
 void addAddressToInode(char* inode, int address){
   inode[8] = address; //first address this isn't good but its a start
 }
+
+
+
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
+// BLOCK AREA
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
 
 
 int findNextAvailableBlock(FILE* disk){
@@ -99,6 +150,7 @@ int findNextAvailableBlock(FILE* disk){
   }
   return -1;
 }
+
 
 //shouldn't need this anymore
 int findNextAvailableBlockAndUseIt(FILE* disk){
@@ -167,16 +219,30 @@ int markBlockFree(int blockNum, FILE* disk){
 
 }
 
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
+// FILE STUFF
+//*****************************************************************************
+//*****************************************************************************
+//*****************************************************************************
+
+//okay what happens when we create a file?
+//we need to get an iNode
+// claim a block to write
+//todo: possibly more than 1 block
+//update inodemap with new inode?
+
 char* createFile(FILE* disk) {
     char* inode = createEmptyInode();
     // Add more things to inode?
     int inodeBlock = findNextAvailableBlock(disk);
+    int whichInode = findNextAvailableInode(disk);
     writeBlock(disk, inodeBlock, inode);
     reserveBlock(inodeBlock, disk);
-    updateInodeMap(disk, inodeBlock);
+    updateInodeMap(disk, inodeBlock, whichInode);
 
     return inode;
-    free(inode);
 }
 
 int writeFile(FILE* disk, char* data){
@@ -206,7 +272,7 @@ int main (int argc, char* argv[]){
   //this reserves first x blocks x is currently 10 do to spec
   for(i=0; i<10; i++)
     reserveBlock(i, disk);
-/*
+
   int nextFreeBlock = findNextAvailableBlock(disk);
 
   printf("The next free block is expect 10: %d\n", nextFreeBlock);
@@ -253,8 +319,11 @@ int main (int argc, char* argv[]){
   nextFreeBlock = findNextAvailableBlock(disk);
   printf("The next free block is expect 12: %d\n", nextFreeBlock);
 
-  */
+
   createInodeMap(disk);
+  findNextAvailableInode(disk);
+  updateInodeMap(disk, findNextAvailableBlock(disk), findNextAvailableInode(disk));
+  findNextAvailableInode(disk);
 
   fclose(disk);
   //this is for super block
