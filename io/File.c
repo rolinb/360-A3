@@ -47,17 +47,17 @@ void createInodeMap(FILE* disk){
   free(buffer);
   buffer = malloc(sizeof(char) * BLOCK_SIZE);
   readBlock(disk, 3, buffer);
-  for(i=128; i<256; i++){
-        hex[0] = (i) >>8;
-        hex[1] = (i) & 0xff;
+  for(i=0; i<128; i++){
+        hex[0] = (i+128) >>8;
+        hex[1] = (i+128) & 0xff;
         buffer[i*4] = hex[0];
         buffer[i*4+1] = hex[1];
   }
   writeBlock(disk, 3, buffer);
   readBlock(disk, 4, buffer);
-  for(i=256; i<384; i++){
-        hex[0] = (i) >>8;
-        hex[1] = (i) & 0xff;
+  for(i=0; i<128; i++){
+        hex[0] = (i+256) >>8;
+        hex[1] = (i+256) & 0xff;
         buffer[i*4] = hex[0];
         buffer[i*4+1] = hex[1];
   }
