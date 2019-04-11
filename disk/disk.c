@@ -11,7 +11,7 @@ int NUM_BLOCKS = 4096;
 
 
 int createDisk(){
-  FILE* disk = fopen("../Disk/vdisk", "wb"); //open file to be written for vdisk
+  FILE* disk = fopen("disk/vdisk", "wb"); //open file to be written for vdisk
   char* init = calloc(BLOCK_SIZE*NUM_BLOCKS, 1);
   fwrite(init, BLOCK_SIZE*NUM_BLOCKS, 1, disk);
 

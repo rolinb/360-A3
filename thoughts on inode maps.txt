@@ -1,0 +1,17 @@
+Okay inode map set up
+if I make all of the inodes beforehand I can refind them, more easily?
+if I do this with 1024 nodes i need to make 128 per block
+block 2 has inodes 0-127 //ignore 0 and 1 but make them for easier math
+block 3 has inodes 128-255
+block 4 has inodes 256 - 383
+block 5 has inodes 385 - 512
+6 513 - 640
+7 641 - 768
+8 769 - 896
+9 897 - 1024
+
+byte 0,1 is inode num 2,3 is block num so everything divisible by 4 is an inode start
+every even that is not divisible by 4 is an address
+
+so inodes are in 0,1 4,5 8 9
+addresses are in 2,3 6,7 10 11
