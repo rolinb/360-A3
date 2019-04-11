@@ -39,16 +39,12 @@ int main(int argc, char* argv[]){
   int fileBlock = findInodeFromMap(disk, inodeFromDirectory);
   printf("grabbing where the inode is expect 13: %d\n", fileBlock);
 
-  int dataBlock = findBlockFromInode(disk, fileBlock);
-  printf("I wonder if this will work expect 14 %d\n", dataBlock);
+  int dataBlock = findBlockFromInode(disk, fileBlock, 0);
+  printf("Expected Value: 14 %d\n", dataBlock);
 
-  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
-  readBlock(disk, dataBlock, buffer);
-
-  printf("Can i reprint the file? %s\n", buffer);
 
   char* bigBoyFile = "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu,";
-  printf("Just to check %lu\n", strlen(bigBoyFile));
+  printf("Just to check should be 600 %lu\n", strlen(bigBoyFile));
   writeFile(disk, bigBoyFile, "big-file");
 
  inodeFromDirectory = findFileInDirectory(disk, 1, "big-file");
@@ -57,8 +53,12 @@ int main(int argc, char* argv[]){
  fileBlock = findInodeFromMap(disk, inodeFromDirectory);
  printf("grabbing where the inode is expect 15: %d\n", fileBlock);
 
- dataBlock = findBlockFromInode(disk, fileBlock);
- printf("I wonder if this will work expect 16/17? %d\n", dataBlock);
+ dataBlock = findBlockFromInode(disk, fileBlock, 0);
+ printf("Expected Value: 16 %d\n", dataBlock);
+
+ dataBlock = findBlockFromInode(disk, fileBlock, 1);
+ printf("Expected Value: 17 %d\n", dataBlock);
+
 
 
 

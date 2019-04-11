@@ -64,12 +64,12 @@ int findInodeFromMap(FILE* disk, int iNode){
   return strtol(tmp, NULL, 16);
 }
 
-int findBlockFromInode(FILE* disk, int inodeAddress){
+int findBlockFromInode(FILE* disk, int inodeAddress, int blockNum){
   char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
   readBlock(disk, inodeAddress, buffer);
   char tmp[3];
-  tmp[0] = buffer[8];
-  tmp[1] = buffer[9];
+  tmp[0] = buffer[8 + blockNum*2];
+  tmp[1] = buffer[9 + blockNum*2];
   tmp[2] = '\0';
 
   return strtol(tmp, NULL, 16);
@@ -176,11 +176,13 @@ char* createEmptyInode(){
 
 //bytes 0-3
 void addFileSizeToInode(char* inode, int size){
-
-  inode[0] = size/1000;
+  printf("Testing this?:\n");
+  inode[0] = size/1000 %10;
   inode[1] = size/100 %10;
-  inode[2] = size/10;
+  inode[2] = size/10 %10;
   inode[3] = size%10;
+  int i=0;
+
 }
 //bytes 4-7
 void addFlagsToInode(char* inode, int fileDir){
@@ -200,6 +202,16 @@ void addAddressToInode(char* inode, int address){
       return;
     }
   }
+}
+
+int getFileSize(char* inode){
+  int size = 0;
+  size += ((int) inode[0])*1000;
+  size += ((int)inode[1]) *100;
+  size += ((int)inode[2]) * 10;
+  size += ((int)inode[3]);
+
+  return size;
 }
 
 
@@ -319,7 +331,7 @@ int addFileToDirectory(FILE* disk, char* filename, int inodeNum){
   int i,j;
   for(i=0; i<512; i+=32){
     if(buffer[i] == 0 && buffer[i+1] == 0 && buffer[i+2] == 0 && buffer[i+3] ==0){
-      printf("any chance i get in here?\n");
+      //printf("any chance i get in here?\n");
       buffer[i]   = inodeNum/1000;
       buffer[i+1] = inodeNum/100 %10;
       buffer[i+2] = inodeNum/10;
@@ -334,6 +346,42 @@ int addFileToDirectory(FILE* disk, char* filename, int inodeNum){
   }
   return -1;
 }
+
+
+int deleteFileFromDirectory(FILE* disk, char* fileName){
+  char* buffer = malloc (sizeof(char) * BLOCK_SIZE);
+  char* filenameInDirectory = malloc(sizeof(char) * 28);
+  int i,j,k, found;
+  found =-1;
+
+  //get which block from findInode
+
+  //for now
+  readBlock(disk, 10, buffer);
+
+  for(i=0; i<16; i++){
+    for(j=4;j<32;j++){
+      if(buffer[32*i+j] != 0){
+        filenameInDirectory[j-4] = buffer[32*i+j];
+      }
+      else{
+        filenameInDirectory[j-4] = '\0';
+      }
+      if(strcmp(filenameInDirectory, fileName) == 0 ){
+        found =1;
+        for(k=strlen(fileName)+4; k>0; k++)
+          buffer[32*i+j-k] = 0;
+        break;
+      }
+    }
+    if(found == 1) break; //ugly double loop exit without a goto
+  }
+  if(found == 1) return 0;
+
+
+  return -1; //didnt find it
+}
+
 //return the inode of the file?
 int findFileInDirectory(FILE* disk, int directoryInode, char* fileName){
   char* buffer = malloc (sizeof(char) * BLOCK_SIZE);
@@ -445,61 +493,55 @@ int writeFile(FILE* disk, char* data, char* filename){
   return 0;
 }
 
-//slow transition to separate test files
-/*
-int main (int argc, char* argv[]){
-  printf("Initalize disk, inode map, pre set early blocks\n");
-  createDisk();
+  char* readFile(FILE* disk, char* fileName){
+    int fileInode = findFileInDirectory(disk, 1, fileName);
+    if(fileInode == -1) return "File not found";
+    char* buffer = malloc (sizeof(char) * BLOCK_SIZE);
+
+    readBlock(disk, findInodeFromMap(disk,fileInode), buffer);
+    int fileSize = getFileSize(buffer);
+    char* buffer2 = malloc (sizeof(char) * fileSize);
+
+    int howManyBlocks = fileSize/BLOCK_SIZE;
+    //printf("File size this probably doesn't work: %d\n", fileSize);
+    int i;
+    int addresses[howManyBlocks+1];
+    for(i=0; i<=howManyBlocks; i++){
+      addresses[i] = findBlockFromInode(disk, findInodeFromMap(disk,fileInode), i);
+      //printf("Just to check? %d\n", addresses[i]);
+      readBlock(disk, addresses[i], buffer2+(i*512));
+      //printf("Maybe? %s\n", buffer2);
+    }
+    return buffer2;
+  }
+//non functional
+  void deleteFile(FILE* disk, char* fileName){
+    int fileInode = findFileInDirectory(disk, 1, fileName);
+    if(fileInode == -1) return;
+    char* buffer = malloc (sizeof(char) * BLOCK_SIZE);
+    int inodeBlock = findInodeFromMap(disk,fileInode);
+    readBlock(disk, inodeBlock, buffer);
+    int fileSize = getFileSize(buffer);
+
+    int howManyBlocks = fileSize/BLOCK_SIZE;
+    //printf("File size this probably doesn't work: %d\n", fileSize);
+    char emptyBlock[4096] = {[0 ... 511] = 0b00000000 };
+    int i;
+    int addresses[howManyBlocks+1];
+    printf("Should be okay til here\n\n");
+    for(i=0; i<=howManyBlocks; i++){
+      printf("Maybe in there we break?\n\n");
+      addresses[i] = findBlockFromInode(disk, inodeBlock, i);
+      writeBlock(disk, addresses[i], emptyBlock);
+      printf("After write?\n");
+      markBlockFree(addresses[i], disk);
+      printf("After free?\n");
+    }
+    writeBlock(disk,inodeBlock, emptyBlock );
+    markBlockFree(inodeBlock,disk);
+    updateInodeMap(disk, 0000, fileInode);
+    deleteFileFromDirectory(disk, fileName);
 
 
 
-  //this is for super block
-  FILE* disk = fopen("../disk/vdisk", "r+b");
-  writeBlock(disk, 0, "ABBA40962000"); //should use variables but placeholder for now
-
-  //char freeBlock[4096] = {0b00000000, 0b00111111, [2 ... 511] = 0b11111111 };
-  char freeBlock[4096] = {[0 ... 511] = 0b11111111 };
-
-
-  writeBlock(disk, 1, freeBlock);
-  int i;
-  //this reserves first x blocks x is currently 10 do to spec
-  for(i=0; i<10; i++)
-    reserveBlock(i, disk);
-
-  reserveBlock(10,disk); //reserve root block for now
-
-  createInodeMap(disk);
-  updateInodeMap(disk, 10, 1);
-
-
-  int nextFreeBlock = findNextAvailableBlock(disk);
-
-  printf("Create a few files with a little bit of data\n");
-  writeFile(disk, "PLEASE WORK", "file-a");
-  nextFreeBlock = findNextAvailableBlock(disk);
-
-  writeFile(disk, "WHAT IF YOU ARE DIFFERENT", "file-b");
-  nextFreeBlock = findNextAvailableBlock(disk);
-
-  writeFile(disk, "PLEASE WORK", "file-c");
-  nextFreeBlock = findNextAvailableBlock(disk);
-
-
-  printf("After 3 files expect block 16 free?: %d\n", nextFreeBlock);
-
-  printf("just reserve a block for testing\n");
-  reserveBlock(nextFreeBlock, disk);
-  nextFreeBlock = findNextAvailableBlock(disk);
-  printf("17 should be next free now: %d\n", nextFreeBlock);
-
-  printf("we wrote 3 files so expect next inode to be 5?: %d\n", findNextAvailableInode(disk) );
-
-  fclose(disk);
-  //this is for super block
-  //FILE* disk = fopen("../disk/vdisk", "w+b");
-  //writeBlock(disk, 1, "0000");
-  //fclose(disk);
-
-}
-*/
+  }

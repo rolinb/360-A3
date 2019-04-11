@@ -9,17 +9,20 @@ pre-set disk:
   make used/free block
   make inodeMap
 reserve block 10 for root directory
-Create file, write data to file assuming 1 block
+Create file, write data to file, read file
+3 tests 1 creates disk 1 makes some field another reads those files
 
-
-To Do:
-sub directories?
-read write in other directories?
-deletion. - freeing block exists
 
 Changes:
 Directory structure will use 4 for inode 28 for filename/directory name
 otherwise there are only 255 inodes and the rest was done prior to this
+
+To Do - no time for this finals and interview took up too much time:
+sub directories?
+read write in other directories?
+deletion. - freeing block exists
+
+
 
 cache/robustness:
 because of time constraints related to other classes, finals, interviews there is no caching
