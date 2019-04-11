@@ -2,6 +2,7 @@
 #include "../disk/disk.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main(int argc, char* argv[]){
   printf("Getting Previously created disk:\n");
@@ -33,7 +34,33 @@ int main(int argc, char* argv[]){
   printf("Expected next inode 4: %d\n", freeInode);
 
    inodeFromDirectory = findFileInDirectory(disk, 1, "file-b");
-  printf("3 is expected since its the first file: %d\n", inodeFromDirectory);
+  printf("3 is expected since its the second file: %d\n", inodeFromDirectory);
+
+  int fileBlock = findInodeFromMap(disk, inodeFromDirectory);
+  printf("grabbing where the inode is expect 13: %d\n", fileBlock);
+
+  int dataBlock = findBlockFromInode(disk, fileBlock);
+  printf("I wonder if this will work expect 14 %d\n", dataBlock);
+
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  readBlock(disk, dataBlock, buffer);
+
+  printf("Can i reprint the file? %s\n", buffer);
+
+  char* bigBoyFile = "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu,";
+  printf("Just to check %lu\n", strlen(bigBoyFile));
+  writeFile(disk, bigBoyFile, "big-file");
+
+ inodeFromDirectory = findFileInDirectory(disk, 1, "big-file");
+ printf("4 is expected since its the third file: %d\n", inodeFromDirectory);
+
+ fileBlock = findInodeFromMap(disk, inodeFromDirectory);
+ printf("grabbing where the inode is expect 15: %d\n", fileBlock);
+
+ dataBlock = findBlockFromInode(disk, fileBlock);
+ printf("I wonder if this will work expect 16/17? %d\n", dataBlock);
+
+
 
 
 

@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-char* findInode(FILE* disk);
+int findInodeFromMap(FILE* disk, int iNode);
+int hexToInteger(char x);
 void createInodeMap(FILE* disk);
 int findNextAvailableInode(FILE* disk);
+int findBlockFromInode(FILE* disk, int inodeAddress);
 int updateInodeMap(FILE* disk, int address, int inode);
 char* createEmptyInode();
 void addFileSizeToInode(char* inode, int size);

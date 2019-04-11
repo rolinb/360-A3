@@ -8,7 +8,36 @@ int MAX_INODES = 1024;
 *Code taken from tutorial 9
 */
 #define TO_HEX(i) (i <= 9 ? '0' + i : 'A' - 10 + i) //convert to hex digit
-
+//helper useless now
+int hexToInteger(char hexValue){
+  int addr;
+  if(hexValue >= '0' && hexValue<='9')
+    addr = hexValue - 0x30;
+    else
+     {
+      printf("TESTING %x\n", hexValue);
+         switch(hexValue)
+         {
+           case (char)0x01: case (char)0x10: addr=1; break;
+           case (char)0x02: case (char)0x20: addr=2; break;
+           case (char)0x03: case (char)0x30: addr=3; break;
+           case (char)0x04: case (char)0x40: addr=4; break;
+           case (char)0x05: case (char)0x50: addr=5; break;
+           case (char)0x06: case (char)0x60: addr=6; break;
+           case (char)0x07: case (char)0x70: addr=7; break;
+           case (char)0x08: case (char)0x80: addr=8; break;
+           case (char)0x09: case (char)0x90: addr=9; break;
+           case (char)0x0A: case (char)0xA0: addr=10; break;
+           case (char)0x0B: case (char)0xB0: addr=11; break;
+           case (char)0x0C: case (char)0xC0: addr=12; break;
+           case (char)0x0D: case (char)0xD0: addr=13; break;
+           case (char)0x0E: case (char)0xE0: addr=14; break;
+           case (char)0x0F: case (char)0xF0: addr=15; break;
+             default: addr=0;
+         }
+     }
+     return addr;
+}
 //*****************************************************************************
 //*****************************************************************************
 //*****************************************************************************
@@ -17,12 +46,35 @@ int MAX_INODES = 1024;
 //*****************************************************************************
 //*****************************************************************************
 
+//127 in 2
+int findInodeFromMap(FILE* disk, int iNode){
+  int whichBlock = 2 + iNode /128;
+  int addr = 0 ;
 
-char* findInode(FILE* disk){
-  //WHAT DO I DO HERE
-  //return which block the inode is in?
-  return NULL;
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  readBlock(disk, whichBlock, buffer);
+  whichBlock = 4*(iNode%128);
+
+  char tmp[3];
+  tmp[0] = buffer[whichBlock+2];
+  tmp[1] = buffer[whichBlock+3];
+  tmp[2] = '\0';
+
+  free(buffer);
+  return strtol(tmp, NULL, 16);
 }
+
+int findBlockFromInode(FILE* disk, int inodeAddress){
+  char* buffer = malloc(sizeof(char) * BLOCK_SIZE);
+  readBlock(disk, inodeAddress, buffer);
+  char tmp[3];
+  tmp[0] = buffer[8];
+  tmp[1] = buffer[9];
+  tmp[2] = '\0';
+
+  return strtol(tmp, NULL, 16);
+}
+
 
 /*
 inode map
@@ -45,8 +97,8 @@ void createInodeMap(FILE* disk){
     for(j=0; j<128;j++){
       hex[0] = (j + ((i-2)*128)) >>8;
       hex[1] = (j+ ((i-2)*128)) & 0xff;
-      buffer[j*4] = hex[0];
-      buffer[j*4+1] = hex[1];
+      buffer[j*4] = TO_HEX(( (j+((i-2)*128) &0xF0) >>4));
+      buffer[j*4+1] = TO_HEX(( (j+((i-2)*128) &0x0F)));
     }
     writeBlock(disk, i, buffer);
   }
@@ -84,25 +136,17 @@ int updateInodeMap(FILE* disk, int address, int inode){
   if(address > NUM_BLOCKS) return -1; //bail out we should never get here
   readBlock(disk, whichBlock, buffer);
 
-  /*int[4] values;
-  value[0] = address/1000;
-  value[1] = address/100 %10;
-  value[2] = address/10 %10;
-  value[3] = address%10;
-*/
   char hex[2];
   hex[0] = (address) >>8;
   hex[1] = (address) & 0xff;
 
   //maths
   //inode 2 is block 8,9 inode 3 is
-  buffer[inode*4+2] = hex[0];
-  buffer[inode*4+2] = hex[1];
+
+  buffer[inode*4+2] = TO_HEX(((address&0xF0)>>4));
+  buffer[inode*4+3] = TO_HEX(((address&0x0F)));
 
   writeBlock(disk, whichBlock, buffer);
-
-
-
 
   return 0;
 
@@ -146,14 +190,13 @@ void addFlagsToInode(char* inode, int fileDir){
   //file=0000, dir=11111
 }
 void addAddressToInode(char* inode, int address){
-  char hex[2];
-  hex[0] = (address) >>8;
-  hex[1] = (address) & 0xff;
+  //char hex[2];
+
   int i;
   for (i=8; i<28;i+=2){
-    if (inode[i]==0){
-      inode[i]=hex[0];
-      inode[i+1]=hex[1];
+    if (inode[i]==0 && inode[i+1] ==0){
+      inode[i]=TO_HEX(((address&0xF0)>>4));
+      inode[i+1]=TO_HEX(((address&0x0F)));
       return;
     }
   }
@@ -377,15 +420,25 @@ int writeFile(FILE* disk, char* data, char* filename){
   addFileSizeToInode(inode, strlen(data));
   reserveBlock(inodeBlock, disk); //so that the file doesn't take it
 
-  int blockToUse = findNextAvailableBlock(disk);//fix for multi blocks
+  int howManyBlocks = strlen(data)/BLOCK_SIZE;
+  int i;
 
+  int blockToUse[howManyBlocks+1];
+  for(i=0; i<=howManyBlocks; i++){
+    blockToUse[i] = findNextAvailableBlock(disk);
+    reserveBlock(blockToUse[i], disk);
+    //printf("File will use block: %d\n", blockToUse[i]);
+  }
   addFlagsToInode(inode, 0);
-  addAddressToInode(inode, blockToUse);
-  writeBlock(disk, inodeBlock, inode); //after mangling inode
-
-  writeBlock(disk, blockToUse, data);
-  reserveBlock(blockToUse, disk);
-
+  for(i=0; i<=howManyBlocks; i++){
+    addAddressToInode(inode, blockToUse[i]);
+  }
+  writeBlock(disk, inodeBlock, inode); //after adding data to inode
+  //char* blocksToWrite = malloc (sizeof(char) * BLOCK_SIZE);
+  for(i=0; i<=howManyBlocks; i++){
+    //printf("This seems risky\n\t%s\n", data+(i*512));
+    writeBlock(disk, blockToUse[i], data+(i*512));
+  }
   //printf("I assume we break here?\n");
   addFileToDirectory(disk, filename, inodeNum);
 
